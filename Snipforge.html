@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SnipForge ⚡</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+:root {
+  --bg:#0f172a;
+  --card:#1e293b;
+  --accent:#22c55e;
+  --text:#e2e8f0;
+}
+body.light {
+  --bg:#f1f5f9;
+  --card:#ffffff;
+  --text:#0f172a;
+}
+body {
+  margin:0;
+  font-family: "Segoe UI", sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  transition:.3s;
+}
+header {
+  padding:15px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  background:var(--card);
+  box-shadow:0 2px 10px rgba(0,0,0,0.2);
+}
+h1 {margin:0;font-size:20px;}
+.container {
+  max-width:900px;
+  margin:auto;
+  padding:20px;
+}
+input, textarea {
+  width:100%;
+  padding:10px;
+  margin:6px 0;
+  border-radius:8px;
+  border:none;
+  outline:none;
+}
+textarea {resize:vertical;}
+button {
+  padding:8px 14px;
+  margin:5px;
+  border:none;
+  border-radius:8px;
+  cursor:pointer;
+  background:var(--accent);
+  color:black;
+  font-weight:bold;
+}
+.actions {margin-bottom:10px;}
+.snippet {
+  background:var(--card);
+  padding:15px;
+  border-radius:12px;
+  margin-top:12px;
+  transition:.2s;
+}
+.snippet:hover {transform:scale(1.01);}
+pre {
+  background:#020617;
+  padding:10px;
+  border-radius:8px;
+  overflow:auto;
+}
+.tag {
+  background:#334155;
+  padding:3px 8px;
+  border-radius:6px;
+  margin-right:5px;
+  font-size:12px;
+}
+.topbar {
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+}
+</style>
+</head>
+
+<body>
+<header>
+  <h1>⚡ SnipForge</h1>
+  <div>
+    <button onclick="toggleTheme()">🌙/☀️</button>
+    <button onclick="exportData()">Export</button>
+    <input type="file" onchange="importData(event)">
+  </div>
+</header>
+
+<div class="container">
+
+<div class="topbar">
+  <input id="title" placeholder="Snippet title">
+  <input id="tags" placeholder="Tags (js, api, css)">
+</div>
+
+<textarea id="code" rows="6" placeholder="Paste your code..."></textarea>
+
+<div class="actions">
+  <button onclick="addSnippet()">Save (Ctrl+S)</button>
+  <input id="search" placeholder="Search..." onkeyup="render()">
+</div>
+
+<div id="list"></div>
+
+</div>
+
+<script>
+let snippets = JSON.parse(localStorage.getItem("snipforge")) || [];
+let theme = localStorage.getItem("theme") || "dark";
+if(theme==="light") document.body.classList.add("light");
+
+function save() {
+  localStorage.setItem("snipforge", JSON.stringify(snippets));
+}
+
+function toggleTheme() {
+  document.body.classList.toggle("light");
+  localStorage.setItem("theme",
+    document.body.classList.contains("light") ? "light" : "dark"
+  );
+}
+
+function addSnippet() {
+  let t = title.value.trim();
+  let c = code.value.trim();
+  let tags = tagsInput();
+
+  if(!t || !c) return alert("Fill fields");
+
+  snippets.unshift({
+    id:Date.now(),
+    title:t,
+    code:c,
+    tags:tags
+  });
+
+  title.value="";
+  code.value="";
+  document.getElementById("tags").value="";
+
+  save();
+  render();
+}
+
+function tagsInput() {
+  return document.getElementById("tags").value
+    .split(",")
+    .map(x=>x.trim())
+    .filter(x=>x);
+}
+
+function deleteSnippet(id) {
+  snippets = snippets.filter(s=>s.id!==id);
+  save();
+  render();
+}
+
+function copyCode(code) {
+  navigator.clipboard.writeText(code);
+}
+
+function render() {
+  let q = search.value.toLowerCase();
+  let list = document.getElementById("list");
+  list.innerHTML="";
+
+  snippets
+  .filter(s =>
+    s.title.toLowerCase().includes(q) ||
+    s.tags.join(",").toLowerCase().includes(q)
+  )
+  .forEach(s=>{
+    let el = document.createElement("div");
+    el.className="snippet";
+
+    el.innerHTML = `
+      <b>${s.title}</b><br>
+      ${s.tags.map(t=>`<span class="tag">${t}</span>`).join("")}
+      <div style="margin-top:8px;">
+        <button onclick='copyCode(${JSON.stringify(s.code)})'>Copy</button>
+        <button onclick="deleteSnippet(${s.id})">Delete</button>
+      </div>
+      <pre>${escapeHtml(s.code)}</pre>
+    `;
+    list.appendChild(el);
+  });
+}
+
+function escapeHtml(text) {
+  return text.replace(/[&<>"']/g, m => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",
+    '"':"&quot;","'":"&#039;"
+  }[m]));
+}
+
+function exportData() {
+  let blob = new Blob([JSON.stringify(snippets)], {type:"application/json"});
+  let a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "snipforge.json";
+  a.click();
+}
+
+function importData(e) {
+  let file = e.target.files[0];
+  let reader = new FileReader();
+  reader.onload = () => {
+    snippets = JSON.parse(reader.result);
+    save();
+    render();
+  };
+  reader.readAsText(file);
+}
+
+document.addEventListener("keydown", e=>{
+  if(e.ctrlKey && e.key==="s"){
+    e.preventDefault();
+    addSnippet();
+  }
+});
+
+render();
+</script>
+</body>
+</html>
